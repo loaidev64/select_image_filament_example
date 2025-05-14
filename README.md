@@ -1,61 +1,93 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# How to install
+```bash
+git clone https://github.com/loaidev64/select_image_filament_example
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+cd select_image_filament_example
 
-## About Laravel
+composer i
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+php artisan key:generate
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+php artisan migrate
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+php artisan make:filament-user
+```
 
-## Learning Laravel
+and then run the laravel project.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+# What we did to implement the select component
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## First
+- downloaded some images and we created a folder called images in storage/app/public and we put the images inside of it.
+- the images was .png and .svg
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Second
+- we added to `filesystem.php`:
+```php
 
-## Laravel Sponsors
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+        'images' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/images'),
+            'url' => env('APP_URL') . '/storage/images',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
 
-### Premium Partners
+```
+- added a blade directive in `boot` function:
+```php
+\Blade::directive('svg', function ($arguments) {
+            // Funky madness to accept multiple arguments into the directive
+            list($path, $class) = array_pad(explode(',', trim($arguments, "() ")), 2, '');
+            $path = trim($path, "' ");
+            $class = trim($class, "' ");
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+            // Create the dom document as per the other answers
+            $svg = new \DOMDocument();
+            $svg->load($path);
+            $svg->documentElement->setAttribute("class", $class);
+            $output = $svg->saveXML($svg->documentElement);
 
-## Contributing
+            return $output;
+        });
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Third
+- created a helper `SelectImageHelper.php`:
+```php
+class SelectImageHelper
+{
+    public static function component(): Forms\Components\Select
+    {
+        return Forms\Components\Select::make('image')
+            ->options(static::getImages())
+            ->allowHtml()
+            ->searchable()
+            ->required();
+    }
 
-## Code of Conduct
+    private static function getImages(): array
+    {
+        $files = Storage::disk('images')->allFiles();
+        $images = [];
+        foreach ($files as $file) {
+            if (static::isPng($file)) {
+                $images[$file] = '<img src="' . asset('storage/images/' . $file) . '" class="h-10 w-10" />';
+            } else {
+                $images[$file] = \Blade::render("@svg('" . storage_path('app/public/images/' . $file) . "', 'w-10 h-10')");
+            }
+        }
+        return $images;
+    }
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+    private static function isPng(string $image): bool
+    {
+        return str($image)->endsWith('.png');
+    }
+}
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```
+## Finally
+- add `SelectImageHelper::component()` to your resource.

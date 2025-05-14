@@ -25,9 +25,7 @@ class SomeModelResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('title')
                     ->required(),
-                Forms\Components\FileUpload::make('image')
-                    ->image()
-                    ->required(),
+                \App\Helpers\Filament\SelectImageHelper::component(),
             ]);
     }
 
